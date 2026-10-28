@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KSR Video Studio</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07111f;color:#fff;font-family:Arial,sans-serif}
+header{padding:14px 18px;background:#0b1d33;border-bottom:1px solid #193653;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:20px;font-weight:800}.tag{font-size:12px;color:#9ec9ff}
+main{max-width:1200px;margin:auto;padding:16px;display:grid;grid-template-columns:320px 1fr;gap:16px}
+.panel,.preview{background:#0b1929;border:1px solid #183652;border-radius:14px;padding:14px}
+h3{margin:4px 0 12px;font-size:15px;color:#d9ecff}
+label{display:block;font-size:12px;color:#a9bdd0;margin:10px 0 5px}
+input[type=file],input[type=text],input[type=range],button{width:100%}
+input[type=file]{padding:9px;background:#10263c;border-radius:8px;color:#cfe5f8}
+input[type=text]{padding:10px;border:1px solid #244866;background:#07111f;color:white;border-radius:8px}
+button{border:0;border-radius:9px;padding:11px 12px;margin-top:9px;background:#1769aa;color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:#17314a}.danger{background:#a33a46}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stage{position:relative;background:#000;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:420px}
+video{max-width:100%;max-height:70vh;display:block}
+#overlay{position:absolute;left:20px;bottom:20px;width:140px;display:none;cursor:move;user-select:none}
+#caption{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font-size:24px;font-weight:800;text-shadow:2px 2px 5px #000;display:none;white-space:nowrap}
+.tools{margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.status{font-size:12px;color:#9ec9ff;margin-top:10px;min-height:16px}
+.note{font-size:11px;line-height:1.5;color:#89a4bc;margin-top:10px}
+@media(max-width:800px){main{grid-template-columns:1fr}.stage{min-height:260px}.tools{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header><div class="logo">KSR Video Studio</div><div class="tag">Simple video + photo overlay editor</div></header>
+<main>
+<section class="panel">
+<h3>1. Original Video</h3>
+<input id="videoFile" type="file" accept="video/*">
+
+<h3 style="margin-top:20px">2. Overlay Photo</h3>
+<input id="imageFile" type="file" accept="image/*">
+<div class="row">
+<div><label>Size</label><input id="imgSize" type="range" min="50" max="300" value="140"></div>
+<div><label>Opacity</label><input id="imgOpacity" type="range" min="20" max="100" value="100"></div>
+</div>
+
+<h3 style="margin-top:20px">3. Text</h3>
+<input id="textInput" type="text" placeholder="Example: Sri Sardhar Marupilla Chitti Model Primary School">
+<div class="row">
+<div><label>Text size</label><input id="textSize" type="range" min="14" max="60" value="24"></div>
+<div><label>Bottom</label><input id="textBottom" type="range" min="5" max="150" value="22"></div>
+</div>
+
+<h3 style="margin-top:20px">4. Quick Layout</h3>
+<button class="secondary" id="leftBtn">Photo: Bottom Left</button>
+<button class="secondary" id="rightBtn">Photo: Bottom Right</button>
+<button class="secondary" id="centerBtn">Photo: Center</button>
+<button class="danger" id="clearBtn">Clear Overlay</button>
+
+<h3 style="margin-top:20px">5. Export</h3>
+<button id="exportBtn">Export Edited Video</button>
+<div id="status" class="status"></div>
+<div class="note">MVP export uses your browser's MediaRecorder. Chrome/Edge usually exports WebM. For MP4 export, a later version can add FFmpeg conversion.</div>
+</section>
+
+<section class="preview">
+<h3>Preview</h3>
+<div class="stage" id="stage">
+<video id="video" controls playsinline></video>
+<img id="overlay">
+<div id="caption"></div>
+</div>
+<div class="tools">
+<button id="playBtn">▶ Play</button>
+<button class="secondary" id="pauseBtn">⏸ Pause</button>
+<button class="secondary" id="muteBtn">🔊 Mute</button>
+<button class="secondary" id="resetBtn">↺ Reset</button>
+</div>
+</section>
+</main>
+<script>
+const video=document.getElementById('video'), overlay=document.getElementById('overlay'),
+caption=document.getElementById('caption'), stage=document.getElementById('stage');
+let overlayURL=null, dragging=false, dx=0, dy=0;
+
+videoFile.onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ video.src=URL.createObjectURL(f); video.load();
+ status.textContent='Video loaded.';
+};
+imageFile.onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ if(overlayURL)URL.revokeObjectURL(overlayURL);
+ overlayURL=URL.createObjectURL(f); overlay.src=overlayURL; overlay.style.display='block';
+};
+imgSize.oninput=()=>overlay.style.width=imgSize.value+'px';
+imgOpacity.oninput=()=>overlay.style.opacity=imgOpacity.value/100;
+textInput.oninput=()=>{caption.textContent=textInput.value;caption.style.display=textInput.value?'block':'none'};
+textSize.oninput=()=>caption.style.fontSize=textSize.value+'px';
+textBottom.oninput=()=>caption.style.bottom=textBottom.value+'px';
+
+function place(pos){
+ const r=stage.getBoundingClientRect(), w=overlay.offsetWidth, h=overlay.offsetHeight;
+ if(pos==='left'){overlay.style.left='20px';overlay.style.right='auto';overlay.style.top='auto';overlay.style.bottom='20px'}
+ if(pos==='right'){overlay.style.right='20px';overlay.style.left='auto';overlay.style.top='auto';overlay.style.bottom='20px'}
+ if(pos==='center'){overlay.style.left='50%';overlay.style.top='50%';overlay.style.right='auto';overlay.style.bottom='auto';overlay.style.transform='translate(-50%,-50%)'}
+}
+leftBtn.onclick=()=>{overlay.style.transform='none';place('left')}
+rightBtn.onclick=()=>{overlay.style.transform='none';place('right')}
+centerBtn.onclick=()=>place('center')
+clearBtn.onclick=()=>overlay.style.display='none';
+playBtn.onclick=()=>video.play(); pauseBtn.onclick=()=>video.pause();
+muteBtn.onclick=()=>{video.muted=!video.muted;muteBtn.textContent=video.muted?'🔇 Unmute':'🔊 Mute'};
+resetBtn.onclick=()=>{video.currentTime=0;overlay.style.display='none';caption.style.display='none';textInput.value=''};
+
+overlay.addEventListener('pointerdown',e=>{
+ dragging=true; overlay.setPointerCapture(e.pointerId);
+ const r=overlay.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
+});
+overlay.addEventListener('pointermove',e=>{
+ if(!dragging)return;
+ const sr=stage.getBoundingClientRect();
+ overlay.style.transform='none'; overlay.style.right='auto';overlay.style.bottom='auto';
+ overlay.style.left=Math.max(0,Math.min(sr.width-overlay.offsetWidth,e.clientX-sr.left-dx))+'px';
+ overlay.style.top=Math.max(0,Math.min(sr.height-overlay.offsetHeight,e.clientY-sr.top-dy))+'px';
+});
+overlay.addEventListener('pointerup',()=>dragging=false);
+
+function statusMsg(s){document.getElementById('status').textContent=s}
+exportBtn.onclick=async()=>{
+ if(!video.src){statusMsg('Please upload a video first.');return}
+ if(!window.MediaRecorder){statusMsg('This browser does not support video export. Try Chrome.');return}
+ statusMsg('Preparing export... Please wait.');
+ video.pause(); video.currentTime=0;
+ await new Promise(r=>setTimeout(r,200));
+ const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+ const vw=video.videoWidth||1280,vh=video.videoHeight||720, scale=Math.min(1,1280/vw);
+ canvas.width=Math.round(vw*scale); canvas.height=Math.round(vh*scale);
+ const stream=canvas.captureStream(30);
+ try{
+   const vs=video.captureStream();
+   vs.getAudioTracks().forEach(t=>stream.addTrack(t));
+ }catch(e){}
+ const chunks=[], rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9,opus'});
+ rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ rec.onstop=()=>{
+   const blob=new Blob(chunks,{type:'video/webm'}), a=document.createElement('a');
+   a.href=URL.createObjectURL(blob);a.download='KSR_Video_Studio_edited.webm';a.click();
+   statusMsg('Export complete. The edited WebM video was downloaded.');
+ };
+ rec.start(250); video.currentTime=0; await video.play();
+ function draw(){
+   if(video.paused||video.ended){rec.stop();return}
+   ctx.drawImage(video,0,0,canvas.width,canvas.height);
+   const sr=stage.getBoundingClientRect(), vr=video.getBoundingClientRect();
+   const sx=canvas.width/vr.width, sy=canvas.height/vr.height;
+   if(overlay.style.display!=='none' && overlay.complete){
+     const or=overlay.getBoundingClientRect();
+     const x=(or.left-vr.left)*sx,y=(or.top-vr.top)*sy,w=or.width*sx,h=or.height*sy;
+     ctx.globalAlpha=parseFloat(overlay.style.opacity||1);ctx.drawImage(overlay,x,y,w,h);ctx.globalAlpha=1;
+   }
+   if(caption.style.display!=='none'){
+     ctx.font='800 '+textSize.value+'px Arial';ctx.textAlign='center';ctx.textBaseline='bottom';
+     ctx.lineWidth=5;ctx.strokeStyle='black';ctx.fillStyle='white';
+     const x=canvas.width/2,y=canvas.height-(Number(textBottom.value)*canvas.height/Math.max(vr.height,1));
+     ctx.strokeText(caption.textContent,x,y);ctx.fillText(caption.textContent,x,y);
+   }
+   requestAnimationFrame(draw);
+ }
+ draw();
+};
+</script>
+</body>
+</html>
