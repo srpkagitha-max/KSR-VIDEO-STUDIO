@@ -1,21 +1,8 @@
-KSR Video Studio — MVP
-==========================
-Open index.html in Chrome/Edge.
+KSR AI Video Studio V1 Patch
+Replace only the existing index.html with the included index.html.
 
-Features:
-- Upload original video
-- Upload photo overlay
-- Resize/opacity
-- Drag photo around preview
-- Quick bottom-left/right/center layouts
-- Add text and adjust size/position
-- Browser-based export to WebM
+This patch adds the KSR AI Video Studio UI while preserving the current manual editor/export.
+The Generate AI Video button is a safe frontend placeholder until the secure Firebase backend is connected.
+Never put AI provider API keys in index.html.
 
-Next version:
-- FFmpeg MP4 export
-- Timeline and trim/cut
-- Multiple overlays
-- Background removal
-- Reference-video "Create Like This" templates
-- Save/load projects
-- Android APK/PWA packaging
+Next milestone: secure Firebase backend, Firestore generation jobs, Storage, TTS/video provider integration, and automatic BGM.
